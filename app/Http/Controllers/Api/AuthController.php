@@ -8,51 +8,60 @@ use App\Models\User;
 use App\Models\GymDetail;
 use Illuminate\Support\Facades\Hash;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
     // ================= REGISTER =================
-    public function register(Request $request)
-    {
-        $request->validate([
-            'name'      => 'required|string|max:255',
-            'email'     => 'required|email|unique:users,email',
-            'password'  => 'required|min:6',
-            'mobile'    => 'required|digits:10|unique:users,mobile',
-            'gym_name'  => 'required|string|max:255',
-            'city'      => 'required|string|max:255',
-            'address'   => 'required|string|max:255',
+ 
+
+public function register(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'owner_name' => 'required|string|max:255',
+        'email'      => 'required|email|unique:users,email',
+        'password'   => 'required|min:6',
+        'mobile'     => 'required|digits:10|unique:users,mobile',
+        'gym_name'   => 'required|string|max:255',
+        'city'       => 'required|string|max:255',
+        'address'    => 'required|string|max:255',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    try {
+
+        $user = User::create([
+            'name'     => $request->owner_name,
+            'email'    => $request->email,
+            'password' => Hash::make($request->password),
+            'mobile'   => $request->mobile,
         ]);
 
-        try {
+        GymDetail::create([
+            'user_id'  => $user->id,
+            'gym_name' => $request->gym_name,
+            'city'     => $request->city,
+            'address'  => $request->address,
+        ]);
 
-            // Create User
-            $user = User::create([
-                'name'     => $request->name,
-                'email'    => $request->email,
-                'password' => Hash::make($request->password),
-                'mobile'   => $request->mobile,
-            ]);
+        return response()->json([
+            'success' => true,
+            'message' => 'User registered successfully',
+            'data'    => $user->load('gymDetail')
+        ], 201);
 
-            // Create Gym Details
-            GymDetail::create([
-                'user_id'  => $user->id,
-                'gym_name' => $request->gym_name,
-                'city'     => $request->city,
-                'address'  => $request->address,
-            ]);
-
-            return successResponse(
-                'User registered successfully',
-                $user->load('gymDetail'),
-                201
-            );
-
-        } catch (\Exception $e) {
-
-            return errorResponse('Something went wrong', 500);
-        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage()
+        ], 500);
     }
+}
 
     // ================= LOGIN =================
 public function login(Request $request)
