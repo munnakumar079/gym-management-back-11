@@ -3,92 +3,114 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Owner;
+use App\Models\User;
 use Illuminate\Http\Request;
-
-
 
 class SuperAdminController extends Controller
 {
-    // 🔹 Get All Owners List
-    public function ownerList()
+    // 🔹 Get All Users With Gym Details
+    public function userList()
     {
-        $owners = Owner::select(
-            'id',
-            'name as owner_name',
-            'gym_name',
-            'mobile',
-            'email',
-            'subscription_status'
-        )->latest()->get();
+        $users = User::with('gymDetail')
+            ->select('id', 'name', 'email', 'mobile', 'status')
+            ->latest()
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id'         => $user->id,
+                    'owner_name' => $user->name,
+                    'email'      => $user->email,
+                    'mobile'     => $user->mobile,
+                    'status'     => $user->status,
+                    'gym_name'   => optional($user->gymDetail)->gym_name,
+                    'city'       => optional($user->gymDetail)->city,
+                    'address'    => optional($user->gymDetail)->address,
+                ];
+            });
 
         return response()->json([
-            'status' => true,
-            'message' => 'Owner list fetched successfully',
-            'data' => $owners
+            'success' => true,
+            'message' => 'User list fetched successfully',
+            'data'    => $users
         ]);
     }
 
-    // 🔹 View Single Owner
-    public function viewOwner($id)
+    // 🔹 View Single User With Gym Details
+    public function viewUser($id)
     {
-        $owner = Owner::find($id);
+        $user = User::with('gymDetail')->find($id);
 
-        if (!$owner) {
+        if (!$user) {
             return response()->json([
-                'status' => false,
-                'message' => 'Owner not found'
-            ]);
+                'success' => false,
+                'message' => 'User not found'
+            ], 404);
         }
 
         return response()->json([
-            'status' => true,
-            'data' => $owner
+            'success' => true,
+            'data' => [
+                'id'         => $user->id,
+                'owner_name' => $user->name,
+                'email'      => $user->email,
+                'mobile'     => $user->mobile,
+                'status'     => $user->status,
+                'gym_name'   => optional($user->gymDetail)->gym_name,
+                'city'       => optional($user->gymDetail)->city,
+                'address'    => optional($user->gymDetail)->address,
+            ]
         ]);
     }
 
-    // 🔹 Update Subscription Status
-    public function updateSubscription(Request $request, $id)
+    // 🔹 Block / Unblock User
+    public function updateStatus(Request $request, $id)
     {
-        $owner = Owner::find($id);
+        $user = User::find($id);
 
-        if (!$owner) {
+        if (!$user) {
             return response()->json([
-                'status' => false,
-                'message' => 'Owner not found'
-            ]);
+                'success' => false,
+                'message' => 'User not found'
+            ], 404);
         }
 
         $request->validate([
-            'subscription_status' => 'required|in:active,expired,trial'
+            'status' => 'required|in:0,1'
         ]);
 
-        $owner->subscription_status = $request->subscription_status;
-        $owner->save();
+        $user->status = $request->status;
+        $user->save();
 
         return response()->json([
-            'status' => true,
-            'message' => 'Subscription updated successfully'
+            'success' => true,
+            'message' => $request->status == 0
+                ? 'User blocked successfully'
+                : 'User activated successfully'
         ]);
     }
 
-    // 🔹 Delete Owner
-    public function deleteOwner($id)
+    // 🔹 Delete User (with Gym Detail)
+    public function deleteUser($id)
     {
-        $owner = Owner::find($id);
+        $user = User::with('gymDetail')->find($id);
 
-        if (!$owner) {
+        if (!$user) {
             return response()->json([
-                'status' => false,
-                'message' => 'Owner not found'
-            ]);
+                'success' => false,
+                'message' => 'User not found'
+            ], 404);
         }
 
-        $owner->delete();
+        // Delete gym detail first
+        if ($user->gymDetail) {
+            $user->gymDetail->delete();
+        }
+
+        $user->delete();
 
         return response()->json([
-            'status' => true,
-            'message' => 'Owner deleted successfully'
+            'success' => true,
+            'message' => 'User deleted successfully'
         ]);
     }
 }
