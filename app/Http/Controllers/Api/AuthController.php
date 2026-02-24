@@ -7,11 +7,15 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\GymDetail;
 use Illuminate\Support\Facades\Hash;
-use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:api', ['except' => ['login', 'register']]);
+    }
+
     // ================= REGISTER =================
     public function register(Request $request)
     {
@@ -34,16 +38,14 @@ class AuthController extends Controller
 
         try {
 
-            // Create User (Default Active = 1)
             $user = User::create([
                 'name'     => $request->owner_name,
                 'email'    => $request->email,
                 'password' => Hash::make($request->password),
                 'mobile'   => $request->mobile,
-                'status'   => 1 // 👈 Default Active
+                'status'   => 1
             ]);
 
-            // Create Gym Detail
             GymDetail::create([
                 'user_id'  => $user->id,
                 'gym_name' => $request->gym_name,
@@ -60,7 +62,8 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => 'Registration failed',
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -80,37 +83,32 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $credentials = $request->only('email', 'password');
 
-        // ❌ User Not Found
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found'
-            ], 404);
-        }
-
-        // ❌ Blocked User
-        if ($user->status == 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Your account is blocked by admin'
-            ], 403);
-        }
-
-        // 🔐 Attempt Login
-        if (!$token = JWTAuth::attempt($request->only('email', 'password'))) {
+        if (!$token = auth('api')->attempt($credentials)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid credentials'
             ], 401);
         }
 
+        $user = auth('api')->user();
+
+        // ❌ Blocked user login not allowed
+        if ($user->status == 0) {
+            auth('api')->logout();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account has been blocked by Admin'
+            ], 403);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
             'data' => [
-                'user'  => auth()->user()->load('gymDetail'),
+                'user'  => $user->load('gymDetail'),
                 'token' => $token,
                 'type'  => 'bearer'
             ]
@@ -122,15 +120,14 @@ class AuthController extends Controller
     {
         return response()->json([
             'success' => true,
-            'message' => 'Profile fetched successfully',
-            'data'    => auth()->user()->load('gymDetail')
+            'data'    => auth('api')->user()->load('gymDetail')
         ]);
     }
 
     // ================= LOGOUT =================
     public function logout()
     {
-        auth()->logout();
+        auth('api')->logout();
 
         return response()->json([
             'success' => true,

@@ -31,12 +31,10 @@ Route::middleware('auth:api')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth:api', 'superadmin'])
-    ->prefix('superadmin')
-    ->group(function () {
+Route::middleware('auth:api')->group(function () {
 
-        Route::get('/users', [SuperAdminController::class, 'userList']);
-        Route::get('/users/{id}', [SuperAdminController::class, 'viewUser']);
-        Route::post('/users/{id}/status', [SuperAdminController::class, 'updateStatus']);
-        Route::delete('/users/{id}', [SuperAdminController::class, 'deleteUser']);
+    Route::get('/superadmin/users', [SuperAdminController::class, 'allUsers']);
+    Route::post('/superadmin/block/{id}', [SuperAdminController::class, 'blockUser']);
+    Route::post('/superadmin/unblock/{id}', [SuperAdminController::class, 'unblockUser']);
+
 });

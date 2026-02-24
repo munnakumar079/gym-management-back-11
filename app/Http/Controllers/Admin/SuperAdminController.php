@@ -3,114 +3,82 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Http\Request;
+use App\Models\User;
 
 class SuperAdminController extends Controller
 {
-    // 🔹 Get All Users With Gym Details
-    public function userList()
-    {
-        $users = User::with('gymDetail')
-            ->select('id', 'name', 'email', 'mobile', 'status')
-            ->latest()
-            ->get()
-            ->map(function ($user) {
-                return [
-                    'id'         => $user->id,
-                    'owner_name' => $user->name,
-                    'email'      => $user->email,
-                    'mobile'     => $user->mobile,
-                    'status'     => $user->status,
-                    'gym_name'   => optional($user->gymDetail)->gym_name,
-                    'city'       => optional($user->gymDetail)->city,
-                    'address'    => optional($user->gymDetail)->address,
-                ];
-            });
+public function allUsers()
+{
+    $authUser = auth()->user();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'User list fetched successfully',
-            'data'    => $users
-        ]);
+    if (!$authUser) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
     }
 
-    // 🔹 View Single User With Gym Details
-    public function viewUser($id)
-    {
-        $user = User::with('gymDetail')->find($id);
+    if ($authUser->status != 3) {
+        return response()->json(['message' => 'Access denied. Super Admin only.'], 403);
+    }
 
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found'
-            ], 404);
+    $users = \App\Models\User::with('gymDetail')->get();
+
+    return response()->json([
+        'success' => true,
+        'data' => $users
+    ]);
+}
+
+    // 🔹 Block User
+    public function blockUser($id)
+    {
+        $authUser = auth()->user();
+
+        if (!$authUser) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'id'         => $user->id,
-                'owner_name' => $user->name,
-                'email'      => $user->email,
-                'mobile'     => $user->mobile,
-                'status'     => $user->status,
-                'gym_name'   => optional($user->gymDetail)->gym_name,
-                'city'       => optional($user->gymDetail)->city,
-                'address'    => optional($user->gymDetail)->address,
-            ]
-        ]);
-    }
+        if ($authUser->status != 3) {
+            return response()->json(['message' => 'Access denied. Super Admin only.'], 403);
+        }
 
-    // 🔹 Block / Unblock User
-    public function updateStatus(Request $request, $id)
-    {
         $user = User::find($id);
 
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found'
-            ], 404);
+            return response()->json(['message' => 'User not found'], 404);
         }
 
-        $request->validate([
-            'status' => 'required|in:0,1'
-        ]);
-
-        $user->status = $request->status;
+        $user->is_blocked = 1; // make sure column exists
         $user->save();
 
         return response()->json([
-            'success' => true,
-            'message' => $request->status == 0
-                ? 'User blocked successfully'
-                : 'User activated successfully'
+            'message' => 'User blocked successfully'
         ]);
     }
 
-    // 🔹 Delete User (with Gym Detail)
-    public function deleteUser($id)
+    // 🔹 Unblock User
+    public function unblockUser($id)
     {
-        $user = User::with('gymDetail')->find($id);
+        $authUser = auth()->user();
+
+        if (!$authUser) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        if ($authUser->status != 3) {
+            return response()->json(['message' => 'Access denied. Super Admin only.'], 403);
+        }
+
+        $user = User::find($id);
 
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found'
-            ], 404);
+            return response()->json(['message' => 'User not found'], 404);
         }
 
-        // Delete gym detail first
-        if ($user->gymDetail) {
-            $user->gymDetail->delete();
-        }
-
-        $user->delete();
+        $user->is_blocked = 0; 
+        $user->save();
 
         return response()->json([
-            'success' => true,
-            'message' => 'User deleted successfully'
+            'message' => 'User unblocked successfully'
         ]);
     }
 }
