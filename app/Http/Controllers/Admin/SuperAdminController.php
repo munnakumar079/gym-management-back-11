@@ -8,77 +8,98 @@ use App\Models\User;
 
 class SuperAdminController extends Controller
 {
-public function allUsers()
-{
-    $authUser = auth()->user();
 
-    if (!$authUser) {
-        return response()->json(['message' => 'Unauthenticated'], 401);
+    // 🔹 User List (Only Super Admin)
+    public function allUsers()
+    {
+        $authUser = auth()->user();
+
+        if (!$authUser) {
+            return response()->json([
+                'message' => 'Unauthenticated'
+            ], 401);
+        }
+
+        // ✅ Sirf status = 3 dekh sakta hai
+        if ($authUser->status != 3) {
+            return response()->json([
+                'message' => 'Only Super Admin can view users'
+            ], 403);
+        }
+
+        // ❌ Super admin list me nahi aayega
+        $users = User::with('gymDetail')
+                    ->where('status','!=',3)
+                    ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $users
+        ]);
     }
 
-    if ($authUser->status != 3) {
-        return response()->json(['message' => 'Access denied. Super Admin only.'], 403);
-    }
 
-    $users = \App\Models\User::with('gymDetail')->get();
-
-    return response()->json([
-        'success' => true,
-        'data' => $users
-    ]);
-}
-
-    // 🔹 Block User
+    // 🔹 Block User (status = 2)
     public function blockUser($id)
     {
         $authUser = auth()->user();
 
-        if (!$authUser) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
-
-        if ($authUser->status != 3) {
-            return response()->json(['message' => 'Access denied. Super Admin only.'], 403);
+        if (!$authUser || $authUser->status != 3) {
+            return response()->json([
+                'message' => 'Only Super Admin can block users'
+            ], 403);
         }
 
         $user = User::find($id);
 
         if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
+            return response()->json([
+                'message' => 'User not found'
+            ], 404);
         }
 
-        $user->is_blocked = 1; // make sure column exists
+        if ($user->status == 3) {
+            return response()->json([
+                'message' => 'Super Admin cannot be blocked'
+            ], 403);
+        }
+
+        $user->status = 2; // blocked
         $user->save();
 
         return response()->json([
+            'success' => true,
             'message' => 'User blocked successfully'
         ]);
     }
 
-    // 🔹 Unblock User
+
+    // 🔹 Unblock User (status = 1)
     public function unblockUser($id)
     {
         $authUser = auth()->user();
 
-        if (!$authUser) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
-
-        if ($authUser->status != 3) {
-            return response()->json(['message' => 'Access denied. Super Admin only.'], 403);
+        if (!$authUser || $authUser->status != 3) {
+            return response()->json([
+                'message' => 'Only Super Admin can unblock users'
+            ], 403);
         }
 
         $user = User::find($id);
 
         if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
+            return response()->json([
+                'message' => 'User not found'
+            ], 404);
         }
 
-        $user->is_blocked = 0; 
+        $user->status = 1; // active
         $user->save();
 
         return response()->json([
+            'success' => true,
             'message' => 'User unblocked successfully'
         ]);
     }
+
 }

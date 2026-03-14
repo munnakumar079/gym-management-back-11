@@ -38,6 +38,10 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/superadmin/block/{id}', [SuperAdminController::class, 'blockUser']);
     Route::post('/superadmin/unblock/{id}', [SuperAdminController::class, 'unblockUser']);
 
+
+    Route::post('/member/store', [MemberController::class, 'store']);
+
+
     Route::get('/subscriptions', [SubscriptionController::class, 'index']);
     Route::post('/subscriptions', [SubscriptionController::class, 'store']);
     Route::put('/subscriptions/{id}', [SubscriptionController::class, 'update']);
